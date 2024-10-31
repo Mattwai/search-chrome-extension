@@ -1,33 +1,66 @@
-import React, {useState} from 'react';
-import {FaSearch} from "react-icons/fa"
-import "./SearchBar.css"
-import getSearchData from '../../../Background/utils/RetrieveSearchData';
-import { AccessTokenResponse } from '../../../Background/types';
+import React, { useState, useCallback } from 'react';
+import { FaSearch } from "react-icons/fa";
+import "./SearchBar.css";
+import { UnifiedSearchResult } from '../../../Background/types';
+import ChromeStorageHandler from '../../../Background/ChromeStorageHandler';
+import { GoogleDriveSearch, NotionSearch, DiscordSearch } from '../../../Background/services/SearchServices';
 
-type ResultProps = {
-  setResults: React.Dispatch<React.SetStateAction<{}[]>>,
-  tokenResponse: AccessTokenResponse,
-  userData: any
+const searchServices = {
+  'Google Drive': new GoogleDriveSearch(),
+  'Notion': new NotionSearch(),
+  'Discord': new DiscordSearch(),
+};
+
+type SearchBarProps = {
+  setResults: React.Dispatch<React.SetStateAction<UnifiedSearchResult[]>>;
 }
-  
-const SearchBar = ({setResults, tokenResponse, userData} : ResultProps) => {
+
+const SearchBar = ({ setResults }: SearchBarProps) => {
   const [input, setInput] = useState("");
-  const handleChange = async (value:string) => {
-    setInput(value)
-    const searchData = await getSearchData(value, tokenResponse);
-    const results = searchData.scopes.flatMap((scope: { results: any; }) => scope.results);
-    console.log(results);
-    setResults(results);
-  }
-  const ref = React.useRef(null);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const handleSearch = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const tokens = await ChromeStorageHandler.GetServiceTokens();
+      const searchPromises = Object.entries(tokens).map(async ([service, token]) => {
+        if (searchServices[service]) {
+          return searchServices[service].search(query, token.access_token);
+        }
+        return [];
+      });
+
+      const results = await Promise.all(searchPromises);
+      const flatResults = results
+        .flat()
+        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      
+      setResults(flatResults);
+    } catch (error) {
+      console.error('Search failed:', error);
+      setResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [setResults]);
+
   return (
-    <div className="input-wrapper" ref={ref}>
-        <FaSearch id="search-icon"/>
-        <input 
-          placeholder="Type to search..." 
-          value={input} 
-          onChange={(e) => handleChange(e.target.value)}
-        />
+    <div className="input-wrapper">
+      <FaSearch id="search-icon"/>
+      <input 
+        placeholder="Search across all your services..." 
+        value={input} 
+        onChange={(e) => {
+          setInput(e.target.value);
+          handleSearch(e.target.value);
+        }}
+      />
+      {isSearching && <div className="search-spinner" />}
     </div>
   );
 };

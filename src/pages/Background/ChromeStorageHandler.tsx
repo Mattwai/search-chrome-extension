@@ -1,41 +1,36 @@
-import { AccessTokenResponse, Client } from "./types";
+import { ServiceToken } from "./types";
 
+class ChromeStorageHandler {
+  private static TOKENS_KEY = 'service_tokens';
 
-function GetAccessTokenStorage(): Promise<AccessTokenResponse | null> {
+  static async GetServiceTokens(): Promise<{ [service: string]: ServiceToken }> {
     return new Promise((resolve) => {
-        chrome.storage.local.get(['tokenResponse'], (tokenResult) => {
-            const tokenResponseResult = tokenResult.tokenResponse as AccessTokenResponse;
-            resolve(tokenResponseResult);});
-    });
-}
-
-function SetAccessTokenStorage(tokenResponse: AccessTokenResponse): void {
-    chrome.storage.local.set({'tokenResponse':tokenResponse}, () =>{
-        console.log('SET NEW: Token response is set to ' + JSON.stringify(tokenResponse));
+      chrome.storage.local.get([this.TOKENS_KEY], (result) => {
+        resolve(result[this.TOKENS_KEY] || {});
       });
-    }
-
-// should NOT store client in local storage, only for testing (need backend)
-function SetClientStorage(client: Client){
-    chrome.storage.local.set({'client':client}, () => {
-        console.log('SET Client ' + JSON.stringify(client));
-      });
-}
-
-function GetClientStorage(): Promise<Client | null> {
-    return new Promise((resolve) => {
-        chrome.storage.local.get(['client'], (clientResult) => {
-            const clientResponseResult = clientResult.client as Client;
-            resolve(clientResponseResult);});
     });
-}
-      
-
-export const ChromeStorageHandler = {
-    GetAccessTokenStorage,
-    SetAccessTokenStorage,
-    SetClientStorage,
-    GetClientStorage
   }
-  
-  export default ChromeStorageHandler;
+
+  static async GetServiceToken(service: string): Promise<ServiceToken | null> {
+    const tokens = await this.GetServiceTokens();
+    return tokens[service] || null;
+  }
+
+  static async SetServiceToken(token: ServiceToken): Promise<void> {
+    const tokens = await this.GetServiceTokens();
+    tokens[token.service] = token;
+    await chrome.storage.local.set({ [this.TOKENS_KEY]: tokens });
+  }
+
+  static async RemoveServiceToken(service: string): Promise<void> {
+    const tokens = await this.GetServiceTokens();
+    delete tokens[service];
+    await chrome.storage.local.set({ [this.TOKENS_KEY]: tokens });
+  }
+
+  static async ClearAllTokens(): Promise<void> {
+    await chrome.storage.local.remove([this.TOKENS_KEY]);
+  }
+}
+
+export default ChromeStorageHandler;
