@@ -1,35 +1,48 @@
 # Dependencies
-node_modules/
-/.pnp
-.pnp.js
+**/node_modules/
+**/.pnp
+**/.pnp.js
+**/.yarn/*
+!**/.yarn/patches
+!**/.yarn/plugins
+!**/.yarn/releases
+!**/.yarn/sdks
+!**/.yarn/versions
+**/.pnp.*
+
+# Build directories
+**/build/
+**/dist/
 
 # Testing
-/coverage
-
-# Production
-/build
-/dist
+**/coverage/
 
 # Development
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+**/.env
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
 
 # Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/logs
+**/*.log
 
 # Editor directories and files
-.idea/
-.vscode/
-*.swp
-*.swo
+**/.idea/
+**/.vscode/
+**/*.swp
+**/*.swo
+**/*.sublime-workspace
+**/*.sublime-project
 
 # OS generated files
 .DS_Store
 .DS_Store?
+**/.DS_Store
 ._*
 .Spotlight-V100
 .Trashes
@@ -37,6 +50,23 @@ ehthumbs.db
 Thumbs.db
 
 # Chrome Extension specific
-*.pem
-*.crx
-secrets.*.js
+**/*.pem
+**/*.crx
+**/secrets.*.js
+**/web-ext-artifacts/
+**/*.zip
+
+# TypeScript
+**/*.tsbuildinfo
+
+# Misc
+**/.cache/
+**/.temp/
+**/.tmp/
+**/temp/
+**/tmp/
+
+# Package managers
+**/yarn.lock
+**/package-lock.json
+.DS_Store
