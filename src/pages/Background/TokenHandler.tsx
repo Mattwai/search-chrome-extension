@@ -1,48 +1,121 @@
 import ChromeStorageHandler from './ChromeStorageHandler';
-import GenerateAccessToken from './utils/GenerateAccessToken';
-import { AccessTokenResponse, Client } from './types';
-import RefreshAccessToken from './RefreshAccessToken';
+import { ServiceToken, OAuthConfig } from './types';
 import { Dispatch, SetStateAction } from 'react';
 
+class TokenHandler {
+  private static createTokenWithTimestamp(token: ServiceToken): ServiceToken {
+    return { ...token, created_time: Date.now() };
+  }
 
-const setTokenCreation = (tokenResponse: AccessTokenResponse): AccessTokenResponse => {
-  const newTokenResponse = { ...tokenResponse, created_time: Date.now()};
-  return newTokenResponse
-}
-
-const getTokenResponse = async (setTokenResponseState: Dispatch<SetStateAction<AccessTokenResponse | null>>): Promise<AccessTokenResponse | null> => {
-  const tokenResponseResult = await ChromeStorageHandler.GetAccessTokenStorage();
-  const clientResponseResult = await ChromeStorageHandler.GetClientStorage();
-  if(tokenResponseResult && clientResponseResult){
-    console.log('FROM LOCAL STORAGE: Token response is set to ' + JSON.stringify(tokenResponseResult.access_token));
-    if (isTokenExpired(tokenResponseResult)) {
-        return await refreshAccessToken(clientResponseResult, tokenResponseResult, setTokenResponseState);
-      } else {
-          return tokenResponseResult;
+  static async getServiceToken(service: string): Promise<ServiceToken | null> {
+    const token = await ChromeStorageHandler.GetServiceToken(service);
+    
+    if (token) {
+      if (this.isTokenExpired(token)) {
+        return await this.refreshServiceToken(service, token);
       }
+      return token;
     }
-  else{
     return null;
   }
-}
 
-const refreshAccessToken = async (client: Client, accessToken: AccessTokenResponse, setTokenResponseState: Dispatch<SetStateAction<AccessTokenResponse | null>>): Promise<AccessTokenResponse | null> => {
-  return await RefreshAccessToken(client, accessToken, setTokenResponseState);
-}
+  static async refreshServiceToken(service: string, token: ServiceToken): Promise<ServiceToken | null> {
+    if (!token.refresh_token) {
+      return null;
+    }
 
-const generateAccessToken = (code: string, client: Client, setTokenResponseState: Dispatch<SetStateAction<AccessTokenResponse | null>>) => {
-  GenerateAccessToken(code, client, setTokenResponseState);
-}
+    try {
+      const config = await this.getServiceConfig(service);
+      if (!config) return null;
 
-const isTokenExpired = (tokenResponse: AccessTokenResponse) => {
-  return (Date.now() - tokenResponse.created_time) / 1000 > tokenResponse.expires_in;
-}
+      const response = await fetch(config.tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: token.refresh_token,
+          client_id: config.clientId,
+          client_secret: config.clientSecret,
+        }),
+      });
 
-export const TokenHandler = {
-  setTokenCreation, 
-  getTokenResponse,
-  refreshAccessToken,
-  generateAccessToken
+      if (!response.ok) {
+        throw new Error('Failed to refresh token');
+      }
+
+      const data = await response.json();
+      const newToken: ServiceToken = this.createTokenWithTimestamp({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token || token.refresh_token,
+        expires_in: data.expires_in,
+        created_time: Date.now(),
+        service: service,
+      });
+
+      await ChromeStorageHandler.SetServiceToken(newToken);
+      return newToken;
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+      return null;
+    }
+  }
+
+  static async generateServiceToken(
+    service: string,
+    code: string,
+    config: OAuthConfig,
+    setTokenState?: Dispatch<SetStateAction<ServiceToken | null>>
+  ): Promise<ServiceToken | null> {
+    try {
+      const response = await fetch(config.tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          code: code,
+          client_id: config.clientId,
+          client_secret: config.clientSecret,
+          redirect_uri: config.redirectUri,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate token');
+      }
+
+      const data = await response.json();
+      const token: ServiceToken = this.createTokenWithTimestamp({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        expires_in: data.expires_in,
+        created_time: Date.now(),
+        service: service,
+      });
+
+      await ChromeStorageHandler.SetServiceToken(token);
+      if (setTokenState) {
+        setTokenState(token);
+      }
+      return token;
+    } catch (error) {
+      console.error('Error generating token:', error);
+      return null;
+    }
+  }
+
+  private static isTokenExpired(token: ServiceToken): boolean {
+    return (Date.now() - token.created_time) / 1000 > token.expires_in;
+  }
+
+  private static async getServiceConfig(service: string): Promise<OAuthConfig | null> {
+    // Implementation would depend on where you store your service configurations
+    // This could be fetched from chrome storage or a central configuration file
+    return null;
+  }
 }
 
 export default TokenHandler;

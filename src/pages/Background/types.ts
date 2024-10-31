@@ -37,4 +37,12 @@ export interface ServiceConfig {
   tokenUrl: string;
   scopes: string[];
   clientId: string;
+}
+
+export interface AccessTokenResponse {
+  access_token: string;
+  refresh_token?: string;
+  expires_in: number;
+  created_time: number;
+  scope?: string;
 } 

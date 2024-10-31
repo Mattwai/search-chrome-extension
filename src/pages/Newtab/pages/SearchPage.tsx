@@ -1,38 +1,37 @@
+import React, { useContext, useEffect, useRef, useState } from "react";
+import { Box, Button, CircularProgress, Typography } from '@mui/material';
+import { motion } from 'framer-motion';
 import SearchBar from "../components/SearchBar/SearchBar";
 import { SearchResultsList } from "../components/SearchResultsList/SearchResultsList";
-import React, { useContext, useEffect, useRef, useState } from "react";
-import Button from "@atlaskit/button";
-import EmptyState from "@atlaskit/empty-state";
-import UserApiCall from "../../Background/UserApiCall";
-import { AppContext } from "../AppContext";
 import TokenHandler from "../../Background/TokenHandler";
-import getSearchData from "../../Background/utils/RetrieveSearchData";
-import getUserData from "../../Background/utils/RetrieveUserContext";
+import { ServiceToken, UnifiedSearchResult } from "../../Background/types";
+import { SUPPORTED_SERVICES } from '../../Background/config/services';
 
 const SearchPage = () => {
-  const [results, setResults] = useState<{}[]>([]);
-  const { clientState, setClientState, tokenResponseState, setTokenResponseState } = useContext(AppContext);
+  const [results, setResults] = useState<UnifiedSearchResult[]>([]);
+  const [serviceTokens, setServiceTokens] = useState<{ [key: string]: ServiceToken }>({});
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
-  const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const fetchAggregatorData = async () => {
+    const fetchServiceTokens = async () => {
       setIsLoading(true);
       try {
-        const tokenResponse = await TokenHandler.getTokenResponse(setTokenResponseState);
-        if (tokenResponse) {
-          const data = await getUserData(tokenResponse);
-          console.log("load data " + data);
-          setUserData(data); // Set the data to the state
-        } else {
-          throw new Error("No Access token, Token may have expired");
+        const tokens: { [key: string]: ServiceToken } = {};
+        for (const [service] of Object.entries(SUPPORTED_SERVICES)) {
+          const token = await TokenHandler.getServiceToken(service);
+          if (token) {
+            tokens[service] = token;
+          }
         }
-       } finally {
+        setServiceTokens(tokens);
+      } catch (error) {
+        console.error('Failed to fetch service tokens:', error);
+      } finally {
         setIsLoading(false);
       }
     };
-    fetchAggregatorData();
+    fetchServiceTokens();
   }, []);
 
   useEffect(() => {
@@ -47,54 +46,46 @@ const SearchPage = () => {
     };
   }, []);
 
-      
-  useEffect(() => {
-    const fetchToken = async () => {
-        const tokenResponse = await TokenHandler.getTokenResponse(setTokenResponseState);
-        if (tokenResponse) {
-            setTokenResponseState(tokenResponse);
-        }
-    };
-    fetchToken();
-}, [clientState, setTokenResponseState]);
-
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
   }
 
   return (
-      <div className="App">
-      <div>{tokenResponseState && tokenResponseState.access_token && <UserApiCall accessToken={tokenResponseState.access_token} />}</div>
-      <div className="search-bar-container" ref={searchContainerRef}>
-        <SearchBar setResults={setResults} tokenResponse={tokenResponseState!} userContext={userData}/>
-        <SearchResultsList results={results}/>
-      </div>
-      <div>{<EmptyState
-      header={"Request the user's information"}
-      primaryAction={
-          <Button appearance={"primary"} onClick={async () => {
-            const newToken = await TokenHandler.getTokenResponse(setTokenResponseState);
-            if(newToken){
-              const data = await getUserData(newToken);
-              console.log(data)
-            }
-            else{
-              console.error("No Access token, Token may have expired");
-            }
-          }}>
-              Make Request
-          </Button>
-      }
-  />}
-    </div>
-    <Button appearance={"primary"} onClick={async () => {
-            const searchData = await getSearchData("test", tokenResponseState!);
-            console.log(searchData)
-          }}>
-              query
-          </Button>
-  </div>
-)};
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className="App"
+    >
+      <Box sx={{ p: 3 }}>
+        <div className="search-bar-container" ref={searchContainerRef}>
+          <SearchBar 
+            setResults={setResults} 
+            serviceTokens={serviceTokens}
+          />
+          <SearchResultsList results={results}/>
+        </div>
+
+        <Box sx={{ mt: 4, textAlign: 'center' }}>
+          <Typography variant="h6" gutterBottom>
+            Connected Services
+          </Typography>
+          {Object.entries(serviceTokens).map(([service, token]) => (
+            <Box key={service} sx={{ mb: 2 }}>
+              <Typography variant="body1">
+                {service}: {token ? 'Connected' : 'Not Connected'}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      </Box>
+    </motion.div>
+  );
+};
 
 export default SearchPage;
 

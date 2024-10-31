@@ -1,39 +1,14 @@
-import '@atlaskit/css-reset'
-import { Code } from '@atlaskit/code'
-import Heading from '@atlaskit/heading'
-import Form, { Field, FormFooter, FormHeader } from "@atlaskit/form"
-import { Box } from '@atlaskit/primitives'
-import Select, {ValueType} from '@atlaskit/select'
-import TextField from '@atlaskit/textfield'
-import React, {useState} from "react"
-import Button from "@atlaskit/button"
+import { Box, Typography, Button } from '@mui/material';
+import { motion } from 'framer-motion';
+import React from 'react';
+import { useState } from 'react';
+import { SUPPORTED_SERVICES } from '../../Background/config/services';
 
 type ServiceConfig = {
   name: string;
   authUrl: string;
   scopes: string[];
   clientId: string;
-}
-
-const SUPPORTED_SERVICES = {
-  GOOGLE_DRIVE: {
-    name: 'Google Drive',
-    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
-    scopes: ['https://www.googleapis.com/auth/drive.readonly'],
-    clientId: process.env.GOOGLE_CLIENT_ID || ''
-  },
-  NOTION: {
-    name: 'Notion',
-    authUrl: 'https://api.notion.com/v1/oauth/authorize',
-    scopes: ['read_content'],
-    clientId: process.env.NOTION_CLIENT_ID || ''
-  },
-  DISCORD: {
-    name: 'Discord',
-    authUrl: 'https://discord.com/api/oauth2/authorize',
-    scopes: ['messages.read'],
-    clientId: process.env.DISCORD_CLIENT_ID || ''
-  }
 };
 
 const AuthorizePage = () => {
@@ -58,31 +33,52 @@ const AuthorizePage = () => {
       `&response_type=code` +
       `&state=${state}`;
 
-    // Store state for validation when the auth callback returns
     localStorage.setItem(`${service.name}_state`, state);
-    
     window.location.href = authUrl;
   };
 
   return (
-    <div>
-      <Heading level="h900">Connect Your Services</Heading>
-      <p>Select and authorize the services you want to search through:</p>
+    <Box sx={{ p: 4 }}>
+      <Typography variant="h2" component="h1" gutterBottom>
+        Connect Your Services
+      </Typography>
+      <Typography variant="body1" sx={{ mb: 4 }}>
+        Select and authorize the services you want to search through:
+      </Typography>
       
-      <div className="services-grid">
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 3 }}>
         {Object.entries(SUPPORTED_SERVICES).map(([key, service]) => (
-          <div key={key} className="service-card">
-            <h3>{service.name}</h3>
-            <Button
-              appearance="primary"
-              onClick={() => handleAuthorize(service)}
+          <motion.div
+            key={key}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <Box
+              sx={{
+                p: 3,
+                borderRadius: 2,
+                bgcolor: 'background.paper',
+                boxShadow: 1,
+                transition: 'all 0.2s',
+                border: selectedServices.includes(key) ? '2px solid primary.main' : '2px solid transparent'
+              }}
             >
-              Connect {service.name}
-            </Button>
-          </div>
+              <Typography variant="h6" gutterBottom>
+                {service.name}
+              </Typography>
+              <Button
+                variant="contained"
+                color={selectedServices.includes(key) ? "secondary" : "primary"}
+                fullWidth
+                onClick={() => handleAuthorize(service)}
+              >
+                Connect {service.name}
+              </Button>
+            </Box>
+          </motion.div>
         ))}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 };
 

@@ -1,21 +1,23 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, Dispatch, SetStateAction } from 'react';
 import { FaSearch } from "react-icons/fa";
 import "./SearchBar.css";
-import { UnifiedSearchResult } from '../../../Background/types';
-import ChromeStorageHandler from '../../../Background/ChromeStorageHandler';
+import { ServiceToken, UnifiedSearchResult } from '../../../Background/types';
 import { GoogleDriveSearch, NotionSearch, DiscordSearch } from '../../../Background/services/SearchServices';
 
 const searchServices = {
   'Google Drive': new GoogleDriveSearch(),
   'Notion': new NotionSearch(),
   'Discord': new DiscordSearch(),
-};
+} as const;
 
-type SearchBarProps = {
-  setResults: React.Dispatch<React.SetStateAction<UnifiedSearchResult[]>>;
+type ServiceKey = keyof typeof searchServices;
+
+interface SearchBarProps {
+  setResults: Dispatch<SetStateAction<UnifiedSearchResult[]>>;
+  serviceTokens: { [key: string]: ServiceToken };
 }
 
-const SearchBar = ({ setResults }: SearchBarProps) => {
+const SearchBar = ({ setResults, serviceTokens }: SearchBarProps) => {
   const [input, setInput] = useState("");
   const [isSearching, setIsSearching] = useState(false);
 
@@ -27,10 +29,9 @@ const SearchBar = ({ setResults }: SearchBarProps) => {
 
     setIsSearching(true);
     try {
-      const tokens = await ChromeStorageHandler.GetServiceTokens();
-      const searchPromises = Object.entries(tokens).map(async ([service, token]) => {
-        if (searchServices[service]) {
-          return searchServices[service].search(query, token.access_token);
+      const searchPromises = Object.entries(serviceTokens).map(async ([service, token]) => {
+        if (service in searchServices && searchServices[service as ServiceKey]) {
+          return searchServices[service as ServiceKey].search(query, token.access_token);
         }
         return [];
       });
@@ -47,7 +48,7 @@ const SearchBar = ({ setResults }: SearchBarProps) => {
     } finally {
       setIsSearching(false);
     }
-  }, [setResults]);
+  }, [setResults, serviceTokens]);
 
   return (
     <div className="input-wrapper">

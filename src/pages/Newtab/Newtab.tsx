@@ -16,17 +16,18 @@ function Newtab() {
   useEffect(() => {
     const fetchTokenResponse = async () => {
       let code = urlParams.get("code");
-      await TokenHandler.getTokenResponse(setTokenResponseState)
-      .then(tokenResponse => {
-        if (tokenResponse != null) {
-          setPage(<SearchPage />);
-        } else if (code !=null) {
-          console.log("Got access code of ", code);
-          setPage(<TokenRequestPage code={code} />);
-        } else {
-          setPage(<AuthorizePage />);
-        }
-      })
+      let state = urlParams.get("state");
+      let service = urlParams.get("service");
+      
+      const tokenResponse = await TokenHandler.generateServiceToken(service!, code!, state!);
+      if (tokenResponse != null) {
+        setPage(<SearchPage />);
+      } else if (code !=null) {
+        console.log("Got access code of ", code);
+        setPage(<TokenRequestPage code={code} />);
+      } else {
+        setPage(<AuthorizePage />);
+      }
     }
     fetchTokenResponse();
   }, [clientState, tokenResponseState]);
